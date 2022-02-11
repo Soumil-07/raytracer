@@ -1,18 +1,23 @@
 pub mod hittable_list;
 pub mod sphere;
 
+use std::rc::Rc;
+
+use crate::material::Material;
+
 use super::{Point3, Ray, Vec3};
 
 pub use hittable_list::HittableList;
 pub use sphere::Sphere;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HitInfo {
     pub point: Point3,
     pub normal: Vec3,
     pub t: f64,
     // Whether the normal is a front-face vector
     pub front_face: bool,
+    pub material: Option<Rc<dyn Material>>,
 }
 
 impl HitInfo {
@@ -29,6 +34,7 @@ impl HitInfo {
             normal: Vec3::new(),
             t: 0.0,
             front_face: false,
+            material: None,
         }
     }
 
@@ -38,10 +44,11 @@ impl HitInfo {
             normal,
             t,
             front_face: false,
+            material: None,
         }
     }
 }
 
 pub trait Hittable {
-    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> (bool, HitInfo);
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64, info: &mut HitInfo) -> bool;
 }

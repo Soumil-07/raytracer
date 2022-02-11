@@ -1,9 +1,8 @@
 use std::ops;
 
-use rand::{
-    prelude::{SmallRng, ThreadRng},
-    Rng,
-};
+use rand::{prelude::SmallRng, Rng};
+
+const EPSILON: f64 = 1e-8;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Vec3 {
@@ -61,7 +60,7 @@ impl Vec3 {
         *self / self.length()
     }
 
-    pub fn random(min: f64, max: f64, rng: &mut ThreadRng) -> Vec3 {
+    pub fn random(min: f64, max: f64, rng: &mut SmallRng) -> Vec3 {
         let x: f64 = rng.gen_range(min..=max);
         let y: f64 = rng.gen_range(min..=max);
         let z: f64 = rng.gen_range(min..=max);
@@ -69,16 +68,27 @@ impl Vec3 {
         return Vec3::from_coords(x, y, z);
     }
 
-    pub fn random_in_unit_sphere(rng: &mut SmallRng) -> Vec3 {
-        loop {
-            let random = Vec3::from_coords(rng.gen::<f64>(), rng.gen::<f64>(), rng.gen::<f64>())
-                * 2.0
-                - Vec3::new();
-            if random.length_squared() >= 1.0 {
-                continue;
-            }
-            return random;
+    pub fn near_zero(&self) -> bool {
+        return self.elements.iter().all(|e| e.abs() < EPSILON);
+    }
+}
+
+pub fn random_in_unit_sphere(rng: &mut SmallRng) -> Vec3 {
+    loop {
+        let random = Vec3::random(-1.0, 1.0, rng);
+        if random.length_squared() >= 1.0 {
+            continue;
         }
+        return random;
+    }
+}
+
+pub fn random_in_hemisphere(rng: &mut SmallRng, normal: &Vec3) -> Vec3 {
+    let random_in_sphere = random_in_unit_sphere(rng);
+    if random_in_sphere.dot(normal) > 0.0 {
+        random_in_sphere
+    } else {
+        -random_in_sphere
     }
 }
 
@@ -129,6 +139,14 @@ impl ops::Mul<f64> for Vec3 {
 impl ops::MulAssign<f64> for Vec3 {
     fn mul_assign(&mut self, rhs: f64) {
         *self = *self * rhs
+    }
+}
+
+impl ops::Mul<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, rhs: Vec3) -> Self::Output {
+        return Vec3::from_coords(self.x() * rhs.x(), self.y() * rhs.y(), self.z() * rhs.z());
     }
 }
 

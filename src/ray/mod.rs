@@ -2,7 +2,7 @@ pub mod hittable;
 pub mod utils;
 mod vec3;
 
-pub use vec3::{Color, Point3, Vec3};
+pub use vec3::{random_in_hemisphere, random_in_unit_sphere, Color, Point3, Vec3};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Ray {

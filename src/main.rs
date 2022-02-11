@@ -1,15 +1,19 @@
 mod camera;
+mod material;
 mod ray;
 
 use std::io;
+use std::rc::Rc;
 
 use camera::Camera;
 use indicatif::ProgressBar;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
-use ray::hittable::{Hittable, HittableList, Sphere};
+use ray::hittable::{HitInfo, Hittable, HittableList, Sphere};
 use ray::utils::write_color;
 use ray::{Color, Ray, Vec3};
+
+use crate::material::{Dielectric, Lambertian, Material, Metal};
 
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
 
@@ -19,15 +23,18 @@ fn ray_color(ray: &Ray, world: &impl Hittable, rng: &mut SmallRng, depth: u32) -
         return Color::new();
     }
 
-    let (hit, rec) = world.hit(ray, 0.00001, f64::INFINITY);
+    let mut rec = HitInfo::empty();
+
+    let hit = world.hit(ray, 0.00001, f64::INFINITY, &mut rec);
     if hit {
-        let target = rec.point + rec.normal + Vec3::random_in_unit_sphere(rng);
-        return ray_color(
-            &Ray::new(rec.point, target - rec.point),
-            world,
-            rng,
-            depth - 1,
-        ) * 0.5;
+        if let Some(mat) = &rec.material {
+            let (success, scattered, attenuation) = mat.scatter(ray, &rec);
+            if success {
+                return attenuation * ray_color(&scattered, world, rng, depth - 1);
+            }
+        }
+
+        return Color::from_coords(0.0, 0.0, 0.0);
     }
 
     let unit_direction = ray.direction.unit();
@@ -42,15 +49,36 @@ fn main() {
     let samples_per_pixel = 100;
     let max_depth = 50;
 
+    // Materials
+    let material_ground: Rc<dyn Material> =
+        Rc::new(Lambertian::new(Color::from_coords(0.8, 0.8, 0.0)));
+    let material_center: Rc<dyn Material> =
+        Rc::new(Lambertian::new(Color::from_coords(0.1, 0.2, 0.5)));
+    let material_left: Rc<dyn Material> = Rc::new(Dielectric::new(1.5));
+    let material_right: Rc<dyn Material> =
+        Rc::new(Metal::new(Color::from_coords(0.8, 0.6, 0.2), 0.0));
+
     // World
     let mut world = HittableList::new();
     world.objects.push(Box::new(Sphere::new(
-        Vec3::from_coords(0.0, 0.0, -1.0),
-        0.5,
-    )));
-    world.objects.push(Box::new(Sphere::new(
         Vec3::from_coords(0.0, -100.5, -1.0),
         100.0,
+        Rc::clone(&material_ground),
+    )));
+    world.objects.push(Box::new(Sphere::new(
+        Vec3::from_coords(0.0, 0.0, -1.0),
+        0.5,
+        Rc::clone(&material_center),
+    )));
+    world.objects.push(Box::new(Sphere::new(
+        Vec3::from_coords(-1.0, 0.0, -1.0),
+        -0.4,
+        Rc::clone(&material_left),
+    )));
+    world.objects.push(Box::new(Sphere::new(
+        Vec3::from_coords(1.0, 0.0, -1.0),
+        0.5,
+        Rc::clone(&material_right),
     )));
 
     // camera
